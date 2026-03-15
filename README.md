@@ -1,0 +1,2 @@
+# Perceptual-Correlates-of-Lexical-Tone-in-Brajbhasha
+A psychological perception experiment with 182 Brajbhasha natives to test their ability to perceptually distinguish words with 'Low' tone from words with 'Neutral' tone. Experiment 1 tested whether 'Low' tone has further subcategories. Whereas, Experiment 2 tested the evidence of perceptual 'tone loss' among younger and more educated generation.
