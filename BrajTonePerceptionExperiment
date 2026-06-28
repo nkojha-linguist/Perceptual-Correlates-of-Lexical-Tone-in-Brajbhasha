@@ -6,6 +6,7 @@
 #####     of ANY two variables in the probability of selecting "Low" response.   #####
 #####                                                                            #####
 ######################################################################################
+
 # Load necessary libraries
 library(readxl)
 library(dplyr)
@@ -13,52 +14,51 @@ library(lme4)
 library(ggplot2)
 library(ggeffects)
 library(patchwork)
+
 # Load the data
-sheet_name <- "Perception Corpus"
-data <- read_excel("BRAJ TONE PERCEPTION EXPERIMENT.xlsx", sheet = sheet_name)
+sheet_name <- "PerceptionCorpus_"
+data <- read_excel("D:\\BRAJ TONE PERCEPTION EXPERIMENT.xlsx", sheet = sheet_name)
+
 # Ensure the sequence of levels in these variables
 data$LoweringType <- factor(data$LoweringType, levels = c("Whole", "1st-Half", "2nd-Half"))
 data$H_Deletion_At <- factor(data$H_Deletion_At, levels = c("Onset", "Intervocalic", "Coda"))
+data$OnsetType <- factor(data$OnsetType, levels = c("No Onset", "Nasal", "Voiced Fricative", "Voiced Stop", "VL Stop"))
+data$Education_I <- factor(data$Education_I, levels = c("Up To Matric", "Above Matric"))
 data$Response <- factor(data$Response, levels = c("Neutral", "Low"))
+data$Education_II <- factor(data$Education_II, levels = c("Non-MAtric", "Secondary", "College"))
+data$Education <- factor(data$Education, levels = c("Uneducated", "Primary", "Matriculation", "Intermediate", "Undergraduate", "Postgraduate"))
+
 # Filter data to focus on 'Low' vs. other responses (binary response)
 data_binary <- data %>%
   mutate(ResponseBinary = ifelse(Response == "Low", 1, 0))
-# NULL MODEL
-logit_NullModel <- glmer(
-  ResponseBinary ~ 1 + (1 | Stimulus),
+
+# SIMPLE Model (Additive)
+logit_SimplerModel <- glmer(
+  ResponseBinary ~ H_Deletion_At + LoweringType + (1 | ParticipantID),
   data = data_binary, family = binomial, control = glmerControl(optimizer = "bobyqa"))
-# SIMPLE Model 1 Design
-logit_Model1 <- glmer(
-  ResponseBinary ~ H_Deletion_At + (1 | Stimulus),
-  data = data_binary, family = binomial, control = glmerControl(optimizer = "bobyqa"))
-summary(logit_Model1)
-# SIMPLE Model 2 Design
-logit_Model2 <- glmer(
-  ResponseBinary ~ LoweringType + (1 | Stimulus),
-  data = data_binary, family = binomial, control = glmerControl(optimizer = "bobyqa"))
-summary(logit_Model2)
-# INTERACTION Model Design
+summary(logit_SimplerModel)
+
+# Interaction Model
 logit_InteractionModel <- glmer(
-  ResponseBinary ~ H_Deletion_At * LoweringType + (1 | Stimulus),
+  ResponseBinary ~ H_Deletion_At * LoweringType + (1 | ParticipantID),
   data = data_binary, family = binomial, control = glmerControl(optimizer = "bobyqa"))
 summary(logit_InteractionModel)
-# LRTs to compare Models
-anova(logit_NullModel, logit_Model1)     
-anova(logit_NullModel, logit_Model2)     
-anova(logit_Model1, logit_InteractionModel)  
-anova(logit_Model2, logit_InteractionModel)  
-anova(logit_NullModel, logit_InteractionModel)  
+
+# Compare Models Using LRT
+anova(logit_SimplerModel, logit_InteractionModel)
 
 #############################################
 ###     FOR PLOTTING ALL MODELS' DATA     ###
 #############################################
-# Generate predicted probabilities for Education and AgeGroup (SIMPLE & in Interaction) with confidence intervals
-pred_hDel <- ggpredict(logit_Model1, terms = "H_Deletion_At")
-pred_LwrT <- ggpredict(logit_Model2, terms = "LoweringType")
-pred_hDel_LwrT <- ggpredict(logit_InteractionModel, terms = c("H_Deletion_At", "LoweringType"))
-# POINT-BAR PLOTS
+
+# Generate predicted probabilities
+pred_hDel_additive <- ggpredict(logit_SimplerModel, terms = "H_Deletion_At")
+pred_LwrT_additive <- ggpredict(logit_SimplerModel, terms = "LoweringType")
+pred_hDel_LwrT_interaction <- ggpredict(logit_InteractionModel, terms = c("H_Deletion_At", "LoweringType"))
+
+# POINT-BAR PLOTS for ADDITIVE MODEL
 # POINT-BAR Plot for H_Deletion_At
-hDel_plot <- ggplot(pred_hDel, aes(x = x, y = predicted)) +
+hDel_plot <- ggplot(pred_hDel_additive, aes(x = x, y = predicted)) +
   geom_col(fill = "skyblue3", width = 0.6) +
   geom_point(size = 4) +
   geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) +
@@ -68,8 +68,9 @@ hDel_plot <- ggplot(pred_hDel, aes(x = x, y = predicted)) +
   theme_minimal(base_size = 14) +
   theme(axis.text.x = element_text(angle = 45, hjust = 0.7))
 print(hDel_plot)
+
 # POINT-BAR Plot for LoweringType
-LwrT_plot <- ggplot(pred_LwrT, aes(x = x, y = predicted)) +
+LwrT_plot <- ggplot(pred_LwrT_additive, aes(x = x, y = predicted)) +
   geom_col(fill = "skyblue3", width = 0.6) +
   geom_point(size = 4) +
   geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) +
@@ -79,15 +80,15 @@ LwrT_plot <- ggplot(pred_LwrT, aes(x = x, y = predicted)) +
   theme_minimal(base_size = 14) +
   theme(axis.text.x = element_text(angle = 45, hjust = 0.7))
 print(LwrT_plot)
+
 # Combine the plots side by side
 combined_plot <- hDel_plot + LwrT_plot
-# Print the combined plot
 print(combined_plot)
 
-# POINT-BAR Plot for Interaction between H_Deletion_At and LoweringTypw
-ggplot(pred_hDel_LwrT, aes(x = x, y = predicted, fill = group)) +
+# POINT-BAR Plot for INTERACTION MODEL
+ggplot(pred_hDel_LwrT_interaction, aes(x = x, y = predicted, fill = group)) +
   geom_col(position = position_dodge(width = 0.7), width = 0.6) +
-  geom_point(size = 2, position = position_dodge(width = 0.7), width = 0.6) +
+  geom_point(size = 3, position = position_dodge(width = 0.7)) +
   geom_errorbar(aes(ymin = conf.low, ymax = conf.high), 
                 width = 0.2, position = position_dodge(width = 0.7)) +
   labs(title = "Predicted Probability of 'Low' Tone Perception \nby /h/ Deletion Location and Lowering Type",
@@ -98,9 +99,6 @@ ggplot(pred_hDel_LwrT, aes(x = x, y = predicted, fill = group)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 0.7))
 
 
-
-
-
 ##################################################################################
 #####                                                                        #####
 #####                       PERCEPTION TEST:  EXPERIMENT 2                   #####
@@ -108,62 +106,92 @@ ggplot(pred_hDel_LwrT, aes(x = x, y = predicted, fill = group)) +
 #####     GENERALISED LINEAR MIXED MODELS ---- TEST AND COMPARE WITH LRT     #####
 #####                                                                        #####
 ##################################################################################
+
 # Load necessary libraries
 library(readxl)
 library(dplyr)
 library(lme4)
 library(ggplot2)
+library(ggeffects)
+
 # Load the data
-sheet_name <- "Perception Corpus"
-data <- read_excel("BRAJ TONE PERCEPTION EXPERIMENT.xlsx", sheet = sheet_name)
+sheet_name <- "PerceptionCorpus_"
+data <- read_excel("D:\\BRAJ TONE PERCEPTION EXPERIMENT.xlsx", sheet = sheet_name)
+
 # Ensure the sequence of levels in these variables
+data$LoweringType <- factor(data$LoweringType, levels = c("Whole", "1st-Half", "2nd-Half"))
+data$H_Deletion_At <- factor(data$H_Deletion_At, levels = c("Onset", "Intervocalic", "Coda"))
+data$OnsetType <- factor(data$OnsetType, levels = c("No Onset", "Nasal", "Voiced Fricative", "Voiced Stop", "VL Stop"))
+data$Education_I <- factor(data$Education_I, levels = c("Up To Matric", "Above Matric"))
 data$Response <- factor(data$Response, levels = c("Neutral", "Low"))
-data$AgeGroup <- factor(data$AgeGroup, levels = c("15-25", "26-35", "36-45", "46-55"))
-data$AgeGroup <- relevel(dataAgeGroup, ref = "15-25")
+data$Education_II <- factor(data$Education_II, levels = c("Non-MAtric", "Secondary", "College"))
 data$Education <- factor(data$Education, levels = c("Uneducated", "Primary", "Matriculation", "Intermediate", "Undergraduate", "Postgraduate"))
 data$Education <- relevel(data$Education, ref = "Postgraduate")
+
 # Filter data to focus on 'Low' vs. other responses (binary response)
 data_binary <- data %>%
   mutate(ResponseBinary = ifelse(Response == "Low", 1, 0))
-# AgeGroup Model Designs
-logit_AgeGroup <- glmer(
-  ResponseBinary ~ AgeGroup + (1 | Stimulus),
+
+# Model 1: AgeGroup + Education (additive model)
+logit_AgeGroup_Education <- glmer(
+  ResponseBinary ~ AgeGroup + Education + (1 | ParticipantID),
   data = data_binary, family = binomial, control = glmerControl(optimizer = "bobyqa"))
-summary(logit_AgeGroup)
-# Education Model Designs
-logit_Education <- glmer(
-  ResponseBinary ~ Education + (1 | Stimulus),
+summary(logit_AgeGroup_Education)
+
+# Model 2: AgeGroup * Education (interaction model)
+logit_AgeGroup_Education_Interaction <- glmer(
+  ResponseBinary ~ AgeGroup * Education + (1 | ParticipantID),
   data = data_binary, family = binomial, control = glmerControl(optimizer = "bobyqa"))
-summary(logit_Education)
-# Compare the MODELS
-anova(logit_AgeGroup, logit_Education)
+summary(logit_AgeGroup_Education_Interaction)
+
+# Compare the MODELS using LRT
+anova(logit_AgeGroup_Education, logit_AgeGroup_Education_Interaction)
 
 ###########################
 ### PLOTTING THE MODELS ###
 ###########################
-# Generate predicted probabilities for Education and AgeGroup with confidence intervals
-pred_edu <- ggpredict(logit_Education, terms = "Education")
-pred_age <- ggpredict(logit_AgeGroup, terms = "AgeGroup")
-# POINT PLOTS
-# POINT Plot for AgeGroup
-ggplot(pred_age, aes(x = x, y = predicted)) +
+
+# Generate predicted probabilities
+# For the additive model
+pred_edu_additive <- ggpredict(logit_AgeGroup_Education, terms = "Education")
+pred_age_additive <- ggpredict(logit_AgeGroup_Education, terms = "AgeGroup")
+
+# For the interaction model
+pred_age_edu_interaction <- ggpredict(logit_AgeGroup_Education_Interaction, terms = c("AgeGroup", "Education"))
+
+# POINT-BAR PLOTS for ADDITIVE MODEL
+# POINT-BAR Plot AgeGroup (from additive model)
+ggplot(pred_age_additive, aes(x = x, y = predicted)) +
   geom_col(fill = "skyblue3", width = 0.6) +
   geom_point(size = 4) +
   geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) +
-  labs(title = "Predicted Probability of 'Low' Tone Perception \nby Age Group",
+  labs(title = "Predicted Probability of 'Low' Tone Perception \nby Age Group (controlling for Education)",
        x = "Age Group",
        y = "Predicted Probability of 'Low' Response") +
   theme_minimal(base_size = 14) +
   theme(axis.text.x = element_text(angle = 45, hjust = 0.7))
-# POINT Plot for Education
-ggplot(pred_edu, aes(x = x, y = predicted)) +
+
+# POINT-BAR Plot for Education (from additive model)
+ggplot(pred_edu_additive, aes(x = x, y = predicted)) +
   geom_col(fill = "orange3", width = 0.6) +
   geom_point(size = 4) +
   geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) +
-  labs(title = "Predicted Probability of 'Low' Tone Perception \nby Education Level",
+  labs(title = "Predicted Probability of 'Low' Tone Perception \nby Education Level (controlling for AgeGroup)",
        x = "Education Level",
        y = "Predicted Probability of 'Low' Response") +
   theme_minimal(base_size = 14) +
   theme(axis.text.x = element_text(angle = 45, hjust = 0.7))
 
+# POINT-BAR PLOT for INTERACTION MODEL: AgeGroup * Education
+ggplot(pred_age_edu_interaction, aes(x = x, y = predicted, fill = group)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+  geom_point(size = 3, position = position_dodge(width = 0.7)) +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), 
+                width = 0.2, position = position_dodge(width = 0.7)) +
+  labs(title = "Predicted Probability of 'Low' Tone Perception by Age Group and Education",
+       x = "Age Group",
+       y = "Predicted Probability of 'Low' Response",
+       fill = "Education Level") +
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 0.7))
 
